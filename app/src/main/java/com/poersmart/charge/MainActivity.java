@@ -23,6 +23,8 @@ import android.text.InputType;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.WindowManager;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
@@ -61,6 +63,7 @@ public class MainActivity extends Activity {
     private Button unlockButton;
     private Button stopChargeButton;
     private Button stopBroadcastButton;
+    private View focusAnchor;
 
     private BluetoothAdapter bluetoothAdapter;
     private BluetoothLeAdvertiser advertiser;
@@ -77,12 +80,14 @@ public class MainActivity extends Activity {
 
     @Override public void onCreate(Bundle bundle) {
         super.onCreate(bundle);
+        getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN);
         handler = new Handler(Looper.getMainLooper());
         BluetoothManager manager = (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
         bluetoothAdapter = manager == null ? null : manager.getAdapter();
 
         buildUi();
         loadPrefs();
+        clearInputFocus();
         requestRuntimePermissions();
         updateCapabilityStatus();
         startShortcutService();
@@ -94,22 +99,99 @@ public class MainActivity extends Activity {
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setPadding(dp(18), dp(20), dp(18), dp(24));
+        root.setFocusable(true);
+        root.setFocusableInTouchMode(true);
+        focusAnchor = root;
         scroll.addView(root, new ScrollView.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
         TextView title = new TextView(this);
         title.setText("桩小易蓝牙钥匙");
-        title.setTextSize(24);
+        title.setTextSize(22);
         title.setGravity(Gravity.CENTER_HORIZONTAL);
         title.setTextColor(0xff202124);
         root.addView(title, fullWidth());
 
         TextView hint = new TextView(this);
-        hint.setText("手机专用极简版。保存充电桩信息后，可手动、通知栏、小组件或小鹏自动化通知触发 10 秒 iBeacon 广播。");
+        hint.setText("保存充电桩信息后，可手动、通知栏、小组件或小鹏自动化触发 10 秒广播。");
         hint.setTextSize(14);
         hint.setTextColor(0xff5f6368);
         hint.setPadding(0, dp(12), 0, dp(18));
         root.addView(hint, fullWidth());
+
+        root.addView(section("状态与操作"));
+
+        statusText = new TextView(this);
+        statusText.setTextSize(15);
+        statusText.setTextColor(0xff202124);
+        statusText.setPadding(dp(12), dp(12), dp(12), dp(12));
+        statusText.setBackground(statusBackground(0xffffffff, 0xffdadce0));
+        root.addView(statusText, fullWidth());
+
+        uuidText = new TextView(this);
+        uuidText.setTextSize(13);
+        uuidText.setTextColor(0xff5f6368);
+        uuidText.setTextIsSelectable(true);
+        uuidText.setPadding(0, dp(8), 0, dp(4));
+        root.addView(uuidText, fullWidth());
+
+        unlockButton = new Button(this);
+        unlockButton.setText("解锁/启动充电");
+        unlockButton.setAllCaps(false);
+        styleButton(unlockButton, 0xff1a73e8, 0xffffffff, 0xff1a73e8);
+        unlockButton.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) {
+                startKeyBroadcast(false);
+            }
+        });
+        root.addView(unlockButton, buttonLayout());
+
+        stopChargeButton = new Button(this);
+        stopChargeButton.setText("停止充电");
+        stopChargeButton.setAllCaps(false);
+        styleButton(stopChargeButton, 0xfffbbc04, 0xff202124, 0xfffbbc04);
+        stopChargeButton.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) {
+                startKeyBroadcast(true);
+            }
+        });
+        root.addView(stopChargeButton, buttonLayout());
+
+        stopBroadcastButton = new Button(this);
+        stopBroadcastButton.setText("停止广播");
+        stopBroadcastButton.setAllCaps(false);
+        styleButton(stopBroadcastButton, 0xffffffff, 0xffd93025, 0xfff4c7c3);
+        stopBroadcastButton.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) {
+                stopAdvertising("广播已停止");
+            }
+        });
+        root.addView(stopBroadcastButton, buttonLayout());
+
+        Button checkButton = new Button(this);
+        checkButton.setText("检测蓝牙广播能力");
+        checkButton.setAllCaps(false);
+        styleButton(checkButton, 0xffffffff, 0xff3c4043, 0xffdadce0);
+        checkButton.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) {
+                updateCapabilityStatus();
+            }
+        });
+        root.addView(checkButton, buttonLayout());
+
+        Button shortcutButton = new Button(this);
+        shortcutButton.setText("刷新通知快捷按钮");
+        shortcutButton.setAllCaps(false);
+        styleButton(shortcutButton, 0xffffffff, 0xff3c4043, 0xffdadce0);
+        shortcutButton.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) {
+                savePrefs();
+                clearInputFocus();
+                startShortcutService();
+                toast("通知快捷按钮已刷新");
+            }
+        });
+        root.addView(shortcutButton, buttonLayout());
 
         root.addView(section("充电桩信息"));
 
@@ -200,82 +282,8 @@ public class MainActivity extends Activity {
         });
         root.addView(notificationAccessButton, buttonLayout());
 
-        root.addView(section("快捷操作"));
-
-        Button checkButton = new Button(this);
-        checkButton.setText("检测车机蓝牙广播能力");
-        checkButton.setAllCaps(false);
-        styleButton(checkButton, 0xffffffff, 0xff3c4043, 0xffdadce0);
-        checkButton.setOnClickListener(new View.OnClickListener() {
-            @Override public void onClick(View v) {
-                updateCapabilityStatus();
-            }
-        });
-        root.addView(checkButton, buttonLayout());
-
-        Button shortcutButton = new Button(this);
-        shortcutButton.setText("启用/刷新通知快捷按钮");
-        shortcutButton.setAllCaps(false);
-        styleButton(shortcutButton, 0xffffffff, 0xff3c4043, 0xffdadce0);
-        shortcutButton.setOnClickListener(new View.OnClickListener() {
-            @Override public void onClick(View v) {
-                savePrefs();
-                startShortcutService();
-                toast("通知快捷按钮已启用");
-            }
-        });
-        root.addView(shortcutButton, buttonLayout());
-
-        unlockButton = new Button(this);
-        unlockButton.setText("解锁/启动充电");
-        unlockButton.setAllCaps(false);
-        styleButton(unlockButton, 0xff1a73e8, 0xffffffff, 0xff1a73e8);
-        unlockButton.setOnClickListener(new View.OnClickListener() {
-            @Override public void onClick(View v) {
-                startKeyBroadcast(false);
-            }
-        });
-        root.addView(unlockButton, buttonLayout());
-
-        stopChargeButton = new Button(this);
-        stopChargeButton.setText("停止充电");
-        stopChargeButton.setAllCaps(false);
-        styleButton(stopChargeButton, 0xfffbbc04, 0xff202124, 0xfffbbc04);
-        stopChargeButton.setOnClickListener(new View.OnClickListener() {
-            @Override public void onClick(View v) {
-                startKeyBroadcast(true);
-            }
-        });
-        root.addView(stopChargeButton, buttonLayout());
-
-        stopBroadcastButton = new Button(this);
-        stopBroadcastButton.setText("停止广播");
-        stopBroadcastButton.setAllCaps(false);
-        styleButton(stopBroadcastButton, 0xffffffff, 0xffd93025, 0xfff4c7c3);
-        stopBroadcastButton.setOnClickListener(new View.OnClickListener() {
-            @Override public void onClick(View v) {
-                stopAdvertising("广播已停止");
-            }
-        });
-        root.addView(stopBroadcastButton, buttonLayout());
-
-        root.addView(section("状态"));
-
-        statusText = new TextView(this);
-        statusText.setTextSize(15);
-        statusText.setTextColor(0xff202124);
-        statusText.setPadding(dp(12), dp(12), dp(12), dp(12));
-        statusText.setBackground(statusBackground(0xffffffff, 0xffdadce0));
-        root.addView(statusText, fullWidth());
-
-        uuidText = new TextView(this);
-        uuidText.setTextSize(13);
-        uuidText.setTextColor(0xff5f6368);
-        uuidText.setTextIsSelectable(true);
-        uuidText.setPadding(0, dp(10), 0, 0);
-        root.addView(uuidText, fullWidth());
-
         setContentView(scroll);
+        root.requestFocus();
     }
 
     private TextView label(String text) {
@@ -329,6 +337,18 @@ public class MainActivity extends Activity {
 
     private int dp(int value) {
         return (int) (value * getResources().getDisplayMetrics().density + 0.5f);
+    }
+
+    private void clearInputFocus() {
+        if (macInput != null) macInput.clearFocus();
+        if (keyInput != null) keyInput.clearFocus();
+        if (autoBluetoothTriggerInput != null) autoBluetoothTriggerInput.clearFocus();
+        if (xpengKeywordInput != null) xpengKeywordInput.clearFocus();
+        if (focusAnchor != null) focusAnchor.requestFocus();
+        InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+        if (imm != null && focusAnchor != null) {
+            imm.hideSoftInputFromWindow(focusAnchor.getWindowToken(), 0);
+        }
     }
 
     private void loadPrefs() {

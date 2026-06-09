@@ -16,6 +16,7 @@ import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
+import android.widget.RemoteViews;
 import android.widget.Toast;
 
 import java.util.Locale;
@@ -174,28 +175,52 @@ public class KeyBroadcastService extends Service {
                 new Intent(this, KeyBroadcastService.class).setAction(ACTION_STOP_BROADCAST),
                 PendingIntent.FLAG_UPDATE_CURRENT);
 
+        RemoteViews compact = buildCompactNotificationView(state, text);
+        compact.setOnClickPendingIntent(R.id.notification_root, open);
+
+        RemoteViews expanded = buildExpandedNotificationView(state, text, detail);
+        expanded.setOnClickPendingIntent(R.id.notification_root, open);
+        expanded.setOnClickPendingIntent(R.id.action_unlock, unlock);
+        expanded.setOnClickPendingIntent(R.id.action_stop_charge, stopCharge);
+        expanded.setOnClickPendingIntent(R.id.action_stop_broadcast, stopBroadcast);
+
         Notification.Builder builder = new Notification.Builder(this)
                 .setSmallIcon(android.R.drawable.stat_sys_data_bluetooth)
                 .setContentTitle(APP_TITLE)
                 .setContentText(text)
                 .setSubText(state)
                 .setContentIntent(open)
+                .setContent(compact)
                 .setOngoing(true)
                 .setOnlyAlertOnce(true)
                 .setShowWhen(false)
                 .setPriority(Notification.PRIORITY_HIGH)
                 .setVisibility(Notification.VISIBILITY_PUBLIC)
-                .setCategory(Notification.CATEGORY_SERVICE)
-                .setStyle(new Notification.BigTextStyle()
-                        .setBigContentTitle(APP_TITLE + " - " + state)
-                        .bigText(detail == null ? text : detail))
-                .addAction(android.R.drawable.ic_media_play, "解锁", unlock)
-                .addAction(android.R.drawable.ic_media_pause, "停充", stopCharge)
-                .addAction(android.R.drawable.ic_menu_close_clear_cancel, "停止", stopBroadcast);
+                .setCategory(Notification.CATEGORY_SERVICE);
         if (Build.VERSION.SDK_INT >= 21) {
             builder.setColor(0xff1a73e8);
         }
-        return builder.build();
+        Notification notification = builder.build();
+        notification.contentView = compact;
+        notification.bigContentView = expanded;
+        return notification;
+    }
+
+    private RemoteViews buildCompactNotificationView(String state, String text) {
+        RemoteViews views = new RemoteViews(getPackageName(), R.layout.notification_compact);
+        views.setTextViewText(R.id.notification_title, APP_TITLE);
+        views.setTextViewText(R.id.notification_text, text);
+        views.setTextViewText(R.id.notification_state, state);
+        return views;
+    }
+
+    private RemoteViews buildExpandedNotificationView(String state, String text, String detail) {
+        RemoteViews views = new RemoteViews(getPackageName(), R.layout.notification_expanded);
+        views.setTextViewText(R.id.notification_title, APP_TITLE);
+        views.setTextViewText(R.id.notification_text, text);
+        views.setTextViewText(R.id.notification_state, state);
+        views.setTextViewText(R.id.notification_detail, detail == null ? text : detail);
+        return views;
     }
 
     private void notifyState(String state, String text) {

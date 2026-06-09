@@ -1,0 +1,9 @@
+build/
+*.apk
+*.idsig
+*.sha256
+*.keystore
+.DS_Store
+
+# The standalone native app does not use the extracted mini-program web assets.
+app/src/main/assets/wx/

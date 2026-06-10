@@ -13,7 +13,8 @@ public class KeyWidgetProvider extends AppWidgetProvider {
             RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.key_widget);
             views.setOnClickPendingIntent(R.id.widget_unlock, serviceIntent(context, KeyBroadcastService.ACTION_UNLOCK, 21));
             views.setOnClickPendingIntent(R.id.widget_stop_charge, serviceIntent(context, KeyBroadcastService.ACTION_STOP_CHARGE, 22));
-            views.setOnClickPendingIntent(R.id.widget_open, PendingIntent.getActivity(context, 23,
+            views.setOnClickPendingIntent(R.id.widget_stop_broadcast, serviceIntent(context, KeyBroadcastService.ACTION_STOP_BROADCAST, 24));
+            views.setOnClickPendingIntent(R.id.widget_header, PendingIntent.getActivity(context, 23,
                     new Intent(context, MainActivity.class), PendingIntent.FLAG_UPDATE_CURRENT));
             manager.updateAppWidget(id, views);
         }

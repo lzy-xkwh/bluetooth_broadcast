@@ -54,7 +54,7 @@ public class KeyBroadcastService extends Service {
         String action = intent == null ? ACTION_SHOW : intent.getAction();
         if (action == null) action = ACTION_SHOW;
 
-        startForeground(NOTIFICATION_ID, buildNotification("待命", "可一键解锁", "下拉展开后可解锁、停充或停止广播。"));
+        startForeground(NOTIFICATION_ID, buildNotification("待命", "小组件可解锁/停充/停止"));
 
         if (ACTION_UNLOCK.equals(action)) {
             startKeyBroadcast(false);
@@ -98,10 +98,8 @@ public class KeyBroadcastService extends Service {
 
             MainActivity.BeaconPayload payload = MainActivity.buildBeaconPayload(mac, key, command, type);
             startAdvertising(payload);
-            String title = stopCharge ? "停止充电广播中" : "解锁/启动广播中";
             String text = stopCharge ? "正在停充，10秒后停止" : "正在解锁，10秒后停止";
-            String detail = title + "，10 秒后自动停止\nUUID: " + payload.uuid;
-            notifyState("广播中", text, detail);
+            notifyState("广播中", text);
             handler.removeCallbacks(autoStopRunnable);
             handler.postDelayed(autoStopRunnable, BROADCAST_MS);
         } catch (Exception e) {
@@ -161,27 +159,12 @@ public class KeyBroadcastService extends Service {
         if (message != null) notifyState("待命", message);
     }
 
-    private Notification buildNotification(String state, String text, String detail) {
+    private Notification buildNotification(String state, String text) {
         PendingIntent open = PendingIntent.getActivity(this, 1,
                 new Intent(this, MainActivity.class), PendingIntent.FLAG_UPDATE_CURRENT);
-        PendingIntent unlock = PendingIntent.getService(this, 2,
-                new Intent(this, KeyBroadcastService.class).setAction(ACTION_UNLOCK),
-                PendingIntent.FLAG_UPDATE_CURRENT);
-        PendingIntent stopCharge = PendingIntent.getService(this, 3,
-                new Intent(this, KeyBroadcastService.class).setAction(ACTION_STOP_CHARGE),
-                PendingIntent.FLAG_UPDATE_CURRENT);
-        PendingIntent stopBroadcast = PendingIntent.getService(this, 4,
-                new Intent(this, KeyBroadcastService.class).setAction(ACTION_STOP_BROADCAST),
-                PendingIntent.FLAG_UPDATE_CURRENT);
 
         RemoteViews compact = buildCompactNotificationView(state, text);
-        compact.setOnClickPendingIntent(R.id.notification_content, open);
-
-        RemoteViews expanded = buildExpandedNotificationView(state, text, detail);
-        expanded.setOnClickPendingIntent(R.id.notification_root, open);
-        expanded.setOnClickPendingIntent(R.id.action_unlock, unlock);
-        expanded.setOnClickPendingIntent(R.id.action_stop_charge, stopCharge);
-        expanded.setOnClickPendingIntent(R.id.action_stop_broadcast, stopBroadcast);
+        compact.setOnClickPendingIntent(R.id.notification_root, open);
 
         Notification.Builder builder = new Notification.Builder(this)
                 .setSmallIcon(R.drawable.ic_notification)
@@ -201,7 +184,6 @@ public class KeyBroadcastService extends Service {
         }
         Notification notification = builder.build();
         notification.contentView = compact;
-        notification.bigContentView = expanded;
         return notification;
     }
 
@@ -209,23 +191,12 @@ public class KeyBroadcastService extends Service {
         RemoteViews views = new RemoteViews(getPackageName(), R.layout.notification_compact);
         views.setTextViewText(R.id.notification_title, APP_TITLE);
         views.setTextViewText(R.id.notification_text, state + " · " + text);
-        return views;
-    }
-
-    private RemoteViews buildExpandedNotificationView(String state, String text, String detail) {
-        RemoteViews views = new RemoteViews(getPackageName(), R.layout.notification_expanded);
-        views.setTextViewText(R.id.notification_title, APP_TITLE);
-        views.setTextViewText(R.id.notification_text, text);
-        views.setTextViewText(R.id.notification_detail, detail == null ? text : detail);
+        views.setTextViewText(R.id.notification_state, state);
         return views;
     }
 
     private void notifyState(String state, String text) {
-        startForeground(NOTIFICATION_ID, buildNotification(state, text, text));
-    }
-
-    private void notifyState(String state, String text, String detail) {
-        startForeground(NOTIFICATION_ID, buildNotification(state, text, detail));
+        startForeground(NOTIFICATION_ID, buildNotification(state, text));
     }
 
     private void toast(final String text) {

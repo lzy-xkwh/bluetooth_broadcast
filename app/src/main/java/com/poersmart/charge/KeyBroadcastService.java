@@ -175,7 +175,7 @@ public class KeyBroadcastService extends Service {
                 PendingIntent.FLAG_UPDATE_CURRENT);
 
         RemoteViews compact = buildCompactNotificationView(state, text);
-        compact.setOnClickPendingIntent(R.id.notification_root, open);
+        compact.setOnClickPendingIntent(R.id.notification_content, open);
 
         RemoteViews expanded = buildExpandedNotificationView(state, text, detail);
         expanded.setOnClickPendingIntent(R.id.notification_root, open);
@@ -208,8 +208,7 @@ public class KeyBroadcastService extends Service {
     private RemoteViews buildCompactNotificationView(String state, String text) {
         RemoteViews views = new RemoteViews(getPackageName(), R.layout.notification_compact);
         views.setTextViewText(R.id.notification_title, APP_TITLE);
-        views.setTextViewText(R.id.notification_text, text);
-        views.setTextViewText(R.id.notification_state, state + " ▼");
+        views.setTextViewText(R.id.notification_text, state + " · " + text);
         return views;
     }
 
@@ -217,7 +216,6 @@ public class KeyBroadcastService extends Service {
         RemoteViews views = new RemoteViews(getPackageName(), R.layout.notification_expanded);
         views.setTextViewText(R.id.notification_title, APP_TITLE);
         views.setTextViewText(R.id.notification_text, text);
-        views.setTextViewText(R.id.notification_state, state + " ▲");
         views.setTextViewText(R.id.notification_detail, detail == null ? text : detail);
         return views;
     }

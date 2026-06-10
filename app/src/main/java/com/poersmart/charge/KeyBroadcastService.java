@@ -54,7 +54,7 @@ public class KeyBroadcastService extends Service {
         String action = intent == null ? ACTION_SHOW : intent.getAction();
         if (action == null) action = ACTION_SHOW;
 
-        startForeground(NOTIFICATION_ID, buildNotification("待命", "可一键解锁", "通知按钮可直接解锁、停止充电或停止当前广播。"));
+        startForeground(NOTIFICATION_ID, buildNotification("待命", "可一键解锁", "下拉展开后可解锁、停充或停止广播。"));
 
         if (ACTION_UNLOCK.equals(action)) {
             startKeyBroadcast(false);
@@ -100,8 +100,7 @@ public class KeyBroadcastService extends Service {
             startAdvertising(payload);
             String title = stopCharge ? "停止充电广播中" : "解锁/启动广播中";
             String text = stopCharge ? "正在停充，10秒后停止" : "正在解锁，10秒后停止";
-            String detail = title + "\n10 秒后自动停止\nUUID: " + payload.uuid
-                    + "\nmajor: 7, minor: " + payload.minor;
+            String detail = title + "，10 秒后自动停止\nUUID: " + payload.uuid;
             notifyState("广播中", text, detail);
             handler.removeCallbacks(autoStopRunnable);
             handler.postDelayed(autoStopRunnable, BROADCAST_MS);
@@ -210,7 +209,7 @@ public class KeyBroadcastService extends Service {
         RemoteViews views = new RemoteViews(getPackageName(), R.layout.notification_compact);
         views.setTextViewText(R.id.notification_title, APP_TITLE);
         views.setTextViewText(R.id.notification_text, text);
-        views.setTextViewText(R.id.notification_state, state);
+        views.setTextViewText(R.id.notification_state, state + " ▼");
         return views;
     }
 
@@ -218,7 +217,7 @@ public class KeyBroadcastService extends Service {
         RemoteViews views = new RemoteViews(getPackageName(), R.layout.notification_expanded);
         views.setTextViewText(R.id.notification_title, APP_TITLE);
         views.setTextViewText(R.id.notification_text, text);
-        views.setTextViewText(R.id.notification_state, state);
+        views.setTextViewText(R.id.notification_state, state + " ▲");
         views.setTextViewText(R.id.notification_detail, detail == null ? text : detail);
         return views;
     }

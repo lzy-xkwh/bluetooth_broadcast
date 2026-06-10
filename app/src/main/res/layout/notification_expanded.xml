@@ -4,11 +4,11 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:background="#F8FAFC"
+    android:background="#00000000"
     android:paddingLeft="12dp"
     android:paddingRight="12dp"
     android:paddingTop="10dp"
-    android:paddingBottom="10dp">
+    android:paddingBottom="8dp">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -18,8 +18,8 @@
 
         <ImageView
             android:id="@+id/notification_icon"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
             android:src="@drawable/ic_launcher"
             android:scaleType="fitCenter" />
 
@@ -69,25 +69,26 @@
         android:id="@+id/notification_detail"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:paddingTop="8dp"
+        android:paddingTop="6dp"
         android:textColor="#3C4043"
-        android:textSize="13sp" />
+        android:textSize="13sp"
+        android:maxLines="2"
+        android:ellipsize="end" />
 
     <LinearLayout
         android:id="@+id/notification_actions"
         android:layout_width="match_parent"
-        android:layout_height="40dp"
+        android:layout_height="34dp"
         android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:paddingTop="8dp">
+        android:paddingTop="6dp">
 
         <TextView
             android:id="@+id/action_unlock"
             android:layout_width="0dp"
-            android:layout_height="32dp"
+            android:layout_height="28dp"
             android:layout_weight="1"
             android:gravity="center"
-            android:background="#E8F0FE"
             android:text="解锁"
             android:textColor="#1A73E8"
             android:textSize="14sp"
@@ -96,26 +97,24 @@
         <TextView
             android:id="@+id/action_stop_charge"
             android:layout_width="0dp"
-            android:layout_height="32dp"
-            android:layout_marginLeft="8dp"
+            android:layout_height="28dp"
+            android:layout_marginLeft="4dp"
             android:layout_weight="1"
             android:gravity="center"
-            android:background="#FEF7E0"
             android:text="停充"
-            android:textColor="#8A5A00"
+            android:textColor="#1A73E8"
             android:textSize="14sp"
             android:textStyle="bold" />
 
         <TextView
             android:id="@+id/action_stop_broadcast"
             android:layout_width="0dp"
-            android:layout_height="32dp"
-            android:layout_marginLeft="8dp"
+            android:layout_height="28dp"
+            android:layout_marginLeft="4dp"
             android:layout_weight="1"
             android:gravity="center"
-            android:background="#FCE8E6"
             android:text="停止"
-            android:textColor="#D93025"
+            android:textColor="#1A73E8"
             android:textSize="14sp"
             android:textStyle="bold" />
     </LinearLayout>

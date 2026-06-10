@@ -6,7 +6,10 @@ ANDROID_JAR="${ANDROID_JAR:-/usr/lib/android-sdk/platforms/android-23/android.ja
 BUILD_TOOLS="${BUILD_TOOLS:-/usr/lib/android-sdk/build-tools/debian}"
 OUT="$ROOT/build/minimal"
 APK_DIR="$ROOT/build/apk"
-KEYSTORE="$APK_DIR/debug.keystore"
+KEYSTORE="${SIGNING_KEYSTORE:-$ROOT/signing/poersmart-upload.keystore}"
+KEY_ALIAS="${SIGNING_KEY_ALIAS:-poersmart}"
+KEYSTORE_PASS="${SIGNING_KEYSTORE_PASS:-android}"
+KEY_PASS="${SIGNING_KEY_PASS:-android}"
 
 if [ ! -f "$ANDROID_JAR" ]; then
   echo "Android jar not found: $ANDROID_JAR" >&2
@@ -28,13 +31,13 @@ mkdir -p "$OUT/gen" "$OUT/classes" "$OUT/dex" "$APK_DIR"
 if [ ! -f "$KEYSTORE" ]; then
   keytool -genkeypair \
     -keystore "$KEYSTORE" \
-    -storepass android \
-    -keypass android \
-    -alias androiddebugkey \
+    -storepass "$KEYSTORE_PASS" \
+    -keypass "$KEY_PASS" \
+    -alias "$KEY_ALIAS" \
     -keyalg RSA \
     -keysize 2048 \
     -validity 10000 \
-    -dname "CN=Android Debug,O=Android,C=US"
+    -dname "CN=Poersmart Bluetooth Key,O=Poersmart,C=CN"
 fi
 
 "$BUILD_TOOLS/aapt" package -f -m \
@@ -61,8 +64,9 @@ javac -source 1.7 -target 1.7 \
 "$BUILD_TOOLS/zipalign" -f 4 "$APK_DIR/poersmart-car-key-unsigned.apk" "$APK_DIR/poersmart-car-key-aligned.apk"
 "$BUILD_TOOLS/apksigner" sign \
   --ks "$KEYSTORE" \
-  --ks-pass pass:android \
-  --key-pass pass:android \
+  --ks-key-alias "$KEY_ALIAS" \
+  --ks-pass "pass:$KEYSTORE_PASS" \
+  --key-pass "pass:$KEY_PASS" \
   --out "$APK_DIR/poersmart-car-key.apk" \
   "$APK_DIR/poersmart-car-key-aligned.apk"
 

@@ -185,7 +185,7 @@ public class KeyBroadcastService extends Service {
         expanded.setOnClickPendingIntent(R.id.action_stop_broadcast, stopBroadcast);
 
         Notification.Builder builder = new Notification.Builder(this)
-                .setSmallIcon(android.R.drawable.stat_sys_data_bluetooth)
+                .setSmallIcon(R.drawable.ic_notification)
                 .setContentTitle(APP_TITLE)
                 .setContentText(text)
                 .setSubText(state)

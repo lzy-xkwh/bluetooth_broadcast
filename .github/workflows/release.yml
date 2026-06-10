@@ -31,6 +31,7 @@ jobs:
       - name: Upload APK to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          body_path: RELEASE_NOTES.md
           files: |
             build/apk/poersmart-car-key.apk
             build/apk/poersmart-car-key.apk.sha256

@@ -60,6 +60,7 @@ public class MainActivity extends Activity {
     private Spinner deviceTypeSpinner;
     private TextView statusText;
     private TextView uuidText;
+    private TextView savedConfigText;
     private Button unlockButton;
     private Button stopChargeButton;
     private Button stopBroadcastButton;
@@ -228,6 +229,26 @@ public class MainActivity extends Activity {
         root.addView(label("设备类型"));
         root.addView(deviceTypeSpinner, fullWidth());
 
+        savedConfigText = new TextView(this);
+        savedConfigText.setTextSize(14);
+        savedConfigText.setTextColor(0xff3c4043);
+        savedConfigText.setPadding(dp(12), dp(10), dp(12), dp(10));
+        savedConfigText.setBackground(statusBackground(0xffffffff, 0xffdadce0));
+        LinearLayout.LayoutParams savedLp = fullWidth();
+        savedLp.topMargin = dp(12);
+        root.addView(savedConfigText, savedLp);
+
+        Button saveConfigButton = new Button(this);
+        saveConfigButton.setText("保存配置");
+        saveConfigButton.setAllCaps(false);
+        styleButton(saveConfigButton, 0xff1a73e8, 0xffffffff, 0xff1a73e8);
+        saveConfigButton.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) {
+                savePrefsWithValidation();
+            }
+        });
+        root.addView(saveConfigButton, buttonLayout());
+
         root.addView(section("自动触发"));
 
         autoBluetoothCheck = new CheckBox(this);
@@ -361,6 +382,7 @@ public class MainActivity extends Activity {
         autoXpengNotificationCheck.setChecked(prefs.getBoolean("autoXpengNotification", true));
         selectedDeviceType = prefs.getInt("deviceType", 0);
         deviceTypeSpinner.setSelection(selectedDeviceType);
+        updateSavedConfigText();
     }
 
     private void savePrefs() {
@@ -373,6 +395,33 @@ public class MainActivity extends Activity {
                 .putString("xpengKeyword", xpengKeywordInput == null ? "POER_UNLOCK_CHARGER" : xpengKeywordInput.getText().toString().trim())
                 .putInt("deviceType", selectedDeviceType)
                 .apply();
+        updateSavedConfigText();
+    }
+
+    private void savePrefsWithValidation() {
+        try {
+            String mac = normalizeHex(macInput.getText().toString());
+            String key = normalizeHex(keyInput.getText().toString());
+            validateMac(mac);
+            if (key.length() > 0) validateKey(key);
+            savePrefs();
+            clearInputFocus();
+            toast("配置已保存");
+        } catch (Exception e) {
+            toast(e.getMessage());
+        }
+    }
+
+    private void updateSavedConfigText() {
+        if (savedConfigText == null) return;
+        SharedPreferences prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
+        String mac = normalizeHex(prefs.getString("mac", ""));
+        String key = normalizeHex(prefs.getString("key", ""));
+        int deviceType = prefs.getInt("deviceType", 0);
+        String macText = mac.length() == 12 ? mac : "未设置";
+        String keyText = key.length() == 32 ? "已保存" : "未填写";
+        String typeText = deviceType == 1 ? "直流桩" : "普通/交流桩";
+        savedConfigText.setText("已保存 MAC：" + macText + "\nKey：" + keyText + "，设备类型：" + typeText);
     }
 
     private void requestRuntimePermissions() {

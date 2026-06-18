@@ -9,7 +9,7 @@
 - 输出文件：`build/apk/poersmart-car-key.apk`
 - 包名：`com.poersmart.charge`
 - 应用名：`桩小易蓝牙钥匙`
-- 当前版本：`1.6.1-car-key`
+- 当前版本：`1.6.2-car-key`
 - SHA256：见 `build/apk/poersmart-car-key.apk.sha256`
 - 签名：固定自用签名，仅适合自用安装测试
 

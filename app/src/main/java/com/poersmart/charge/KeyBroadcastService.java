@@ -189,7 +189,6 @@ public class KeyBroadcastService extends Service {
 
     private RemoteViews buildCompactNotificationView(String state, String text) {
         RemoteViews views = new RemoteViews(getPackageName(), R.layout.notification_compact);
-        views.setTextViewText(R.id.notification_title, APP_TITLE);
         views.setTextViewText(R.id.notification_text, state + " · " + text);
         views.setTextViewText(R.id.notification_state, state);
         return views;

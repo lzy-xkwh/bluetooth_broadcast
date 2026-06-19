@@ -133,7 +133,7 @@ public class KeyBroadcastService extends Service {
         AdvertiseSettings settings = new AdvertiseSettings.Builder()
                 .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY)
                 .setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_HIGH)
-                .setConnectable(true)
+                .setConnectable(false)
                 .build();
         AdvertiseData data = new AdvertiseData.Builder()
                 .setIncludeDeviceName(false)
@@ -156,6 +156,7 @@ public class KeyBroadcastService extends Service {
             } catch (Exception ignored) {}
         }
         advertiseCallback = null;
+        advertiser = null;
         if (message != null) notifyState("待命", message);
     }
 
@@ -189,7 +190,7 @@ public class KeyBroadcastService extends Service {
 
     private RemoteViews buildCompactNotificationView(String state, String text) {
         RemoteViews views = new RemoteViews(getPackageName(), R.layout.notification_compact);
-        views.setTextViewText(R.id.notification_text, state + " · " + text);
+        views.setTextViewText(R.id.notification_text, text);
         views.setTextViewText(R.id.notification_state, state);
         return views;
     }

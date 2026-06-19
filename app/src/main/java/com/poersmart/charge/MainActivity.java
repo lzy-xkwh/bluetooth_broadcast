@@ -609,7 +609,7 @@ public class MainActivity extends Activity {
         AdvertiseSettings settings = new AdvertiseSettings.Builder()
                 .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY)
                 .setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_HIGH)
-                .setConnectable(true)
+                .setConnectable(false)
                 .build();
 
         AdvertiseData data = new AdvertiseData.Builder()
@@ -637,6 +637,7 @@ public class MainActivity extends Activity {
             } catch (Exception ignored) {}
         }
         advertiseCallback = null;
+        advertiser = null;
         if (message != null) statusText.setText(message);
     }
 

@@ -9,7 +9,7 @@
 - 输出文件：`build/apk/poersmart-car-key.apk`
 - 包名：`com.poersmart.charge`
 - 应用名：`桩小易蓝牙钥匙`
-- 当前版本：`1.6.2-car-key`
+- 当前版本：`1.6.3-car-key`
 - SHA256：见 `build/apk/poersmart-car-key.apk.sha256`
 - 签名：固定自用签名，仅适合自用安装测试
 
@@ -134,7 +134,7 @@ adb install -r /root/wxre/wx_standalone_apk/build/apk/poersmart-car-key.apk
 App 启动后会创建常驻通知。通知栏只显示一行轻量状态，不再放操作按钮：
 
 - 左侧：App 图标，尺寸按普通通知收敛。
-- 中间：当前状态和操作，例如 `待命 · 小组件可解锁/停充/停止`。
+- 中间：当前操作摘要，例如 `小组件可解锁/停充/停止`。
 - 右侧：状态短标签，例如 `待命`、`广播中`、`不可用`。
 
 通知栏显示已做可读性优化：

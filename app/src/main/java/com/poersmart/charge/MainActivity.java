@@ -3,10 +3,6 @@ package com.poersmart.charge;
 import android.app.Activity;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothManager;
-import android.bluetooth.le.AdvertiseCallback;
-import android.bluetooth.le.AdvertiseData;
-import android.bluetooth.le.AdvertiseSettings;
-import android.bluetooth.le.BluetoothLeAdvertiser;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
@@ -15,8 +11,6 @@ import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Build;
 import android.os.Bundle;
-import android.os.Handler;
-import android.os.Looper;
 import android.provider.Settings;
 import android.text.InputFilter;
 import android.text.InputType;
@@ -48,7 +42,6 @@ import javax.crypto.spec.SecretKeySpec;
 
 public class MainActivity extends Activity {
     private static final String PREFS = "poersmart_key";
-    private static final int BROADCAST_MS = 10000;
     private static final int REQUEST_PERMISSIONS = 1001;
 
     private EditText macInput;
@@ -67,22 +60,12 @@ public class MainActivity extends Activity {
     private View focusAnchor;
 
     private BluetoothAdapter bluetoothAdapter;
-    private BluetoothLeAdvertiser advertiser;
-    private AdvertiseCallback advertiseCallback;
-    private Handler handler;
     private static int encryptedCounter = 0;
     private int selectedDeviceType = 0;
-
-    private final Runnable autoStopRunnable = new Runnable() {
-        @Override public void run() {
-            stopAdvertising("广播已自动停止");
-        }
-    };
 
     @Override public void onCreate(Bundle bundle) {
         super.onCreate(bundle);
         getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN);
-        handler = new Handler(Looper.getMainLooper());
         BluetoothManager manager = (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
         bluetoothAdapter = manager == null ? null : manager.getAdapter();
 
@@ -142,7 +125,7 @@ public class MainActivity extends Activity {
         styleButton(unlockButton, 0xff1a73e8, 0xffffffff, 0xff1a73e8);
         unlockButton.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) {
-                startKeyBroadcast(false);
+                requestServiceBroadcast(false);
             }
         });
         root.addView(unlockButton, buttonLayout());
@@ -153,7 +136,7 @@ public class MainActivity extends Activity {
         styleButton(stopChargeButton, 0xfffbbc04, 0xff202124, 0xfffbbc04);
         stopChargeButton.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) {
-                startKeyBroadcast(true);
+                requestServiceBroadcast(true);
             }
         });
         root.addView(stopChargeButton, buttonLayout());
@@ -164,7 +147,8 @@ public class MainActivity extends Activity {
         styleButton(stopBroadcastButton, 0xffffffff, 0xffd93025, 0xfff4c7c3);
         stopBroadcastButton.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) {
-                stopAdvertising("广播已停止");
+                startServiceAction(KeyBroadcastService.ACTION_STOP_BROADCAST);
+                statusText.setText("已请求停止广播，请查看通知栏状态");
             }
         });
         root.addView(stopBroadcastButton, buttonLayout());
@@ -491,7 +475,7 @@ public class MainActivity extends Activity {
                 && bluetoothAdapter.getBluetoothLeAdvertiser() != null;
     }
 
-    private void startKeyBroadcast(boolean stopCharge) {
+    private void requestServiceBroadcast(boolean stopCharge) {
         try {
             if (!canAdvertise()) {
                 updateCapabilityStatus();
@@ -504,23 +488,20 @@ public class MainActivity extends Activity {
             if (key.length() > 0) validateKey(key);
             savePrefs();
 
-            int command = 0;
-            int type = selectedDeviceType == 1 ? 1 : 2;
-            if (stopCharge) {
-                command = selectedDeviceType == 1 ? 1 : 2;
-            }
-
-            BeaconPayload payload = buildBeaconPayload(mac, key, command, type);
-            startAdvertising(payload);
-            uuidText.setText("UUID: " + payload.uuid + "\nmajor: 7, minor: " + payload.minor
-                    + "\n模式: " + (key.length() > 0 ? "Key 加密广播" : "普通广播"));
-            statusText.setText((stopCharge ? "停止充电" : "解锁/启动") + "广播中，10 秒后自动停止");
-            handler.removeCallbacks(autoStopRunnable);
-            handler.postDelayed(autoStopRunnable, BROADCAST_MS);
+            String action = stopCharge ? KeyBroadcastService.ACTION_STOP_CHARGE : KeyBroadcastService.ACTION_UNLOCK;
+            startServiceAction(action);
+            uuidText.setText("广播由后台服务执行，通知栏会同步显示状态。");
+            statusText.setText("已请求" + (stopCharge ? "停止充电" : "解锁/启动") + "广播，10 秒后自动停止");
         } catch (Exception e) {
             statusText.setText("失败：" + e.getMessage());
             toast(e.getMessage());
         }
+    }
+
+    private void startServiceAction(String action) {
+        Intent intent = new Intent(this, KeyBroadcastService.class);
+        intent.setAction(action);
+        startService(intent);
     }
 
     static BeaconPayload buildBeaconPayload(String mac, String key, int command, int type) throws Exception {
@@ -599,46 +580,6 @@ public class MainActivity extends Activity {
         System.arraycopy(tag, 0, out, 12, 4);
         encryptedCounter = (encryptedCounter + 1) & 0xffff;
         return formatUuid(out);
-    }
-
-    private void startAdvertising(BeaconPayload payload) throws Exception {
-        stopAdvertising(null);
-        advertiser = bluetoothAdapter.getBluetoothLeAdvertiser();
-        if (advertiser == null) throw new Exception("无法获取 BLE advertiser");
-
-        AdvertiseSettings settings = new AdvertiseSettings.Builder()
-                .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY)
-                .setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_HIGH)
-                .setConnectable(false)
-                .build();
-
-        AdvertiseData data = new AdvertiseData.Builder()
-                .setIncludeDeviceName(false)
-                .addManufacturerData(0x004c, iBeaconData(payload.uuid, 7, payload.minor, 0))
-                .build();
-
-        advertiseCallback = new AdvertiseCallback() {
-            @Override public void onStartSuccess(AdvertiseSettings settingsInEffect) {
-                statusText.setText(statusText.getText() + "\n广播启动成功");
-            }
-
-            @Override public void onStartFailure(int errorCode) {
-                statusText.setText("广播启动失败，错误码：" + errorCode);
-            }
-        };
-        advertiser.startAdvertising(settings, data, advertiseCallback);
-    }
-
-    private void stopAdvertising(String message) {
-        handler.removeCallbacks(autoStopRunnable);
-        if (advertiser != null && advertiseCallback != null) {
-            try {
-                advertiser.stopAdvertising(advertiseCallback);
-            } catch (Exception ignored) {}
-        }
-        advertiseCallback = null;
-        advertiser = null;
-        if (message != null) statusText.setText(message);
     }
 
     static byte[] iBeaconData(String uuid, int major, int minor, int measuredPower) {

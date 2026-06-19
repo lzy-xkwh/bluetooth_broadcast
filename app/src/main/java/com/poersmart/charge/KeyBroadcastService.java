@@ -86,6 +86,7 @@ public class KeyBroadcastService extends Service {
             String mac = normalizeHex(prefs.getString("mac", ""));
             String key = normalizeHex(prefs.getString("key", ""));
             int deviceType = prefs.getInt("deviceType", 0);
+            boolean compatibleMode = prefs.getBoolean("bluetoothCompatibleMode", true);
             if (mac.length() != 12) {
                 notifyState("缺少 MAC", "先打开 App 保存充电桩 MAC");
                 toast("先打开 App 保存充电桩 MAC");
@@ -96,8 +97,8 @@ public class KeyBroadcastService extends Service {
             int type = deviceType == 1 ? 1 : 2;
             if (stopCharge) command = deviceType == 1 ? 1 : 2;
 
-            MainActivity.BeaconPayload payload = MainActivity.buildBeaconPayload(mac, key, command, type);
-            startAdvertising(payload);
+            BeaconProtocol.BeaconPayload payload = BeaconProtocol.buildBeaconPayload(mac, key, command, type);
+            startAdvertising(payload, compatibleMode);
             String text = stopCharge ? "正在停充，10秒后停止" : "正在解锁，10秒后停止";
             notifyState("广播中", text);
             handler.removeCallbacks(autoStopRunnable);
@@ -125,19 +126,19 @@ public class KeyBroadcastService extends Service {
         return "当前不可广播";
     }
 
-    private void startAdvertising(MainActivity.BeaconPayload payload) throws Exception {
+    private void startAdvertising(BeaconProtocol.BeaconPayload payload, boolean compatibleMode) throws Exception {
         stopAdvertising(null);
         advertiser = bluetoothAdapter.getBluetoothLeAdvertiser();
         if (advertiser == null) throw new Exception("无法获取 BLE advertiser");
 
         AdvertiseSettings settings = new AdvertiseSettings.Builder()
-                .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY)
-                .setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_HIGH)
+                .setAdvertiseMode(compatibleMode ? AdvertiseSettings.ADVERTISE_MODE_BALANCED : AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY)
+                .setTxPowerLevel(compatibleMode ? AdvertiseSettings.ADVERTISE_TX_POWER_MEDIUM : AdvertiseSettings.ADVERTISE_TX_POWER_HIGH)
                 .setConnectable(false)
                 .build();
         AdvertiseData data = new AdvertiseData.Builder()
                 .setIncludeDeviceName(false)
-                .addManufacturerData(0x004c, MainActivity.iBeaconData(payload.uuid, 7, payload.minor, 0))
+                .addManufacturerData(0x004c, BeaconProtocol.iBeaconData(payload.uuid, 7, payload.minor, 0))
                 .build();
         advertiseCallback = new AdvertiseCallback() {
             @Override public void onStartSuccess(AdvertiseSettings settingsInEffect) {}

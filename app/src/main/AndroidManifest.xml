@@ -1,7 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.poersmart.charge"
-    android:versionCode="15"
-    android:versionName="1.6.4-car-key">
+    android:versionCode="16"
+    android:versionName="1.6.5-car-key">
     <uses-sdk android:minSdkVersion="21" android:targetSdkVersion="23" />
     <uses-permission android:name="android.permission.BLUETOOTH" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />

@@ -6,10 +6,11 @@ ANDROID_JAR="${ANDROID_JAR:-/usr/lib/android-sdk/platforms/android-23/android.ja
 BUILD_TOOLS="${BUILD_TOOLS:-/usr/lib/android-sdk/build-tools/debian}"
 OUT="$ROOT/build/minimal"
 APK_DIR="$ROOT/build/apk"
-KEYSTORE="${SIGNING_KEYSTORE:-$ROOT/signing/poersmart-upload.keystore}"
+KEYSTORE="${SIGNING_KEYSTORE:-$ROOT/build/signing/poersmart-upload.keystore}"
 KEY_ALIAS="${SIGNING_KEY_ALIAS:-poersmart}"
 KEYSTORE_PASS="${SIGNING_KEYSTORE_PASS:-android}"
 KEY_PASS="${SIGNING_KEY_PASS:-android}"
+REQUIRE_SIGNING_SECRET="${REQUIRE_SIGNING_SECRET:-0}"
 
 if [ ! -f "$ANDROID_JAR" ]; then
   echo "Android jar not found: $ANDROID_JAR" >&2
@@ -28,7 +29,18 @@ done
 rm -rf "$OUT"
 mkdir -p "$OUT/gen" "$OUT/classes" "$OUT/dex" "$APK_DIR"
 
+if [ -n "${SIGNING_KEYSTORE_B64:-}" ]; then
+  mkdir -p "$(dirname "$KEYSTORE")"
+  printf '%s' "$SIGNING_KEYSTORE_B64" | base64 -d > "$KEYSTORE"
+fi
+
+if [ "$REQUIRE_SIGNING_SECRET" = "1" ] && [ ! -f "$KEYSTORE" ]; then
+  echo "Release signing keystore missing. Set SIGNING_KEYSTORE_B64 or SIGNING_KEYSTORE." >&2
+  exit 1
+fi
+
 if [ ! -f "$KEYSTORE" ]; then
+  mkdir -p "$(dirname "$KEYSTORE")"
   keytool -genkeypair \
     -keystore "$KEYSTORE" \
     -storepass "$KEYSTORE_PASS" \
@@ -38,6 +50,7 @@ if [ ! -f "$KEYSTORE" ]; then
     -keysize 2048 \
     -validity 10000 \
     -dname "CN=Poersmart Bluetooth Key,O=Poersmart,C=CN"
+  echo "Generated local development signing key: $KEYSTORE" >&2
 fi
 
 "$BUILD_TOOLS/aapt" package -f -m \

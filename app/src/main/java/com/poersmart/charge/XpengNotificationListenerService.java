@@ -24,6 +24,10 @@ public class XpengNotificationListenerService extends NotificationListenerServic
         keyword = keyword == null ? DEFAULT_KEYWORD : keyword.trim();
         if (keyword.length() == 0) keyword = DEFAULT_KEYWORD;
 
+        String packageFilter = prefs.getString("xpengPackage", "");
+        packageFilter = packageFilter == null ? "" : packageFilter.trim();
+        if (packageFilter.length() > 0 && !sbn.getPackageName().equals(packageFilter)) return;
+
         String text = notificationText(sbn);
         if (!containsIgnoreCase(text, keyword)) return;
 

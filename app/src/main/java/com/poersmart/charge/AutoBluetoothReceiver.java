@@ -10,6 +10,7 @@ import java.util.Locale;
 
 public class AutoBluetoothReceiver extends BroadcastReceiver {
     private static final String PREFS = "poersmart_key";
+    private static final long COOLDOWN_MS = 60000L;
 
     @Override public void onReceive(Context context, Intent intent) {
         if (intent == null || !BluetoothDevice.ACTION_ACL_CONNECTED.equals(intent.getAction())) return;
@@ -17,6 +18,10 @@ public class AutoBluetoothReceiver extends BroadcastReceiver {
         SharedPreferences prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
         if (!prefs.getBoolean("autoBluetooth", false)) return;
         if (normalizeHex(prefs.getString("mac", "")).length() != 12) return;
+
+        long now = System.currentTimeMillis();
+        long last = prefs.getLong("lastBluetoothUnlockAt", 0L);
+        if (now - last < COOLDOWN_MS) return;
 
         BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
         String name = "";
@@ -36,6 +41,11 @@ public class AutoBluetoothReceiver extends BroadcastReceiver {
         trigger = trigger == null ? "" : trigger.trim().toLowerCase(Locale.US);
         String source = (name + " " + address).toLowerCase(Locale.US);
         if (trigger.length() > 0 && !source.contains(trigger)) return;
+
+        prefs.edit()
+                .putLong("lastBluetoothUnlockAt", now)
+                .putString("lastBluetoothSource", source)
+                .apply();
 
         Intent service = new Intent(context, KeyBroadcastService.class);
         service.setAction(KeyBroadcastService.ACTION_UNLOCK);

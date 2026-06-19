@@ -4,7 +4,6 @@ build/
 *.sha256
 *.keystore
 !signing/
-!signing/poersmart-upload.keystore
 .DS_Store
 
 # The standalone native app does not use the extracted mini-program web assets.

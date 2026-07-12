@@ -83,6 +83,7 @@ public class KeyBroadcastService extends Service {
                 return;
             }
             SharedPreferences prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
+            migrateBluetoothModeDefault(prefs);
             String mac = normalizeHex(prefs.getString("mac", ""));
             String key = normalizeHex(prefs.getString("key", ""));
             int deviceType = prefs.getInt("deviceType", 0);
@@ -198,6 +199,14 @@ public class KeyBroadcastService extends Service {
 
     private void notifyState(String state, String text) {
         startForeground(NOTIFICATION_ID, buildNotification(state, text));
+    }
+
+    private void migrateBluetoothModeDefault(SharedPreferences prefs) {
+        if (prefs.getBoolean("bluetoothModeDefaultMigrated", false)) return;
+        prefs.edit()
+                .putBoolean("bluetoothCompatibleMode", true)
+                .putBoolean("bluetoothModeDefaultMigrated", true)
+                .apply();
     }
 
     private void toast(final String text) {

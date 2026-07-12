@@ -55,6 +55,7 @@ public class MainActivity extends Activity {
     private View focusAnchor;
 
     private BluetoothAdapter bluetoothAdapter;
+    private boolean loadingPrefs;
     private int selectedDeviceType = 0;
 
     @Override public void onCreate(Bundle bundle) {
@@ -91,7 +92,7 @@ public class MainActivity extends Activity {
         root.addView(title, fullWidth());
 
         TextView hint = new TextView(this);
-        hint.setText("保存充电桩信息后，可手动、小组件或小鹏自动化触发 10 秒广播。");
+        hint.setText("保存充电桩信息后，可手动、小组件或车主 App 自动化通知触发 10 秒广播。");
         hint.setTextSize(14);
         hint.setTextColor(0xff5f6368);
         hint.setPadding(0, dp(12), 0, dp(18));
@@ -200,7 +201,7 @@ public class MainActivity extends Activity {
         deviceTypeSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
                 selectedDeviceType = position;
-                savePrefs();
+                savePrefsIfReady();
             }
             @Override public void onNothingSelected(AdapterView<?> parent) {}
         });
@@ -208,11 +209,11 @@ public class MainActivity extends Activity {
         root.addView(deviceTypeSpinner, fullWidth());
 
         bluetoothCompatibleModeCheck = new CheckBox(this);
-        bluetoothCompatibleModeCheck.setText("蓝牙兼容模式（降低广播强度）");
+        bluetoothCompatibleModeCheck.setText("蓝牙兼容模式（推荐）");
         bluetoothCompatibleModeCheck.setTextSize(14);
         bluetoothCompatibleModeCheck.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
             @Override public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
-                savePrefs();
+                savePrefsIfReady();
             }
         });
         root.addView(bluetoothCompatibleModeCheck, fullWidth());
@@ -244,7 +245,7 @@ public class MainActivity extends Activity {
         autoBluetoothCheck.setTextSize(14);
         autoBluetoothCheck.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
             @Override public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
-                savePrefs();
+                savePrefsIfReady();
             }
         });
         root.addView(autoBluetoothCheck, fullWidth());
@@ -258,29 +259,29 @@ public class MainActivity extends Activity {
         root.addView(autoBluetoothTriggerInput, fullWidth());
 
         autoXpengNotificationCheck = new CheckBox(this);
-        autoXpengNotificationCheck.setText("小鹏通知关键词自动解锁");
+        autoXpengNotificationCheck.setText("自动化通知关键词自动解锁");
         autoXpengNotificationCheck.setTextSize(14);
         autoXpengNotificationCheck.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
             @Override public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
-                savePrefs();
+                savePrefsIfReady();
             }
         });
         root.addView(autoXpengNotificationCheck, fullWidth());
 
         xpengKeywordInput = new EditText(this);
-        xpengKeywordInput.setHint("小鹏通知关键词，例如 POER_UNLOCK_CHARGER");
+        xpengKeywordInput.setHint("自动化通知关键词，例如 POER_UNLOCK_CHARGER");
         xpengKeywordInput.setTextSize(15);
         xpengKeywordInput.setSingleLine(true);
         xpengKeywordInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
-        root.addView(label("小鹏通知关键词"));
+        root.addView(label("自动化通知关键词"));
         root.addView(xpengKeywordInput, fullWidth());
 
         xpengPackageInput = new EditText(this);
-        xpengPackageInput.setHint("可选，小鹏 App 包名；留空不限制来源");
+        xpengPackageInput.setHint("可选，来源 App 包名；留空不限制来源");
         xpengPackageInput.setTextSize(15);
         xpengPackageInput.setSingleLine(true);
         xpengPackageInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
-        root.addView(label("小鹏通知来源包名"));
+        root.addView(label("通知来源包名"));
         root.addView(xpengPackageInput, fullWidth());
 
         Button notificationAccessButton = new Button(this);
@@ -371,17 +372,35 @@ public class MainActivity extends Activity {
 
     private void loadPrefs() {
         SharedPreferences prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
-        macInput.setText(prefs.getString("mac", ""));
-        keyInput.setText(prefs.getString("key", ""));
-        autoBluetoothTriggerInput.setText(prefs.getString("autoBluetoothTrigger", ""));
-        autoBluetoothCheck.setChecked(prefs.getBoolean("autoBluetooth", false));
-        xpengKeywordInput.setText(prefs.getString("xpengKeyword", "POER_UNLOCK_CHARGER"));
-        xpengPackageInput.setText(prefs.getString("xpengPackage", ""));
-        autoXpengNotificationCheck.setChecked(prefs.getBoolean("autoXpengNotification", true));
-        bluetoothCompatibleModeCheck.setChecked(prefs.getBoolean("bluetoothCompatibleMode", true));
-        selectedDeviceType = prefs.getInt("deviceType", 0);
-        deviceTypeSpinner.setSelection(selectedDeviceType);
+        migrateBluetoothModeDefault(prefs);
+        loadingPrefs = true;
+        try {
+            macInput.setText(prefs.getString("mac", ""));
+            keyInput.setText(prefs.getString("key", ""));
+            autoBluetoothTriggerInput.setText(prefs.getString("autoBluetoothTrigger", ""));
+            autoBluetoothCheck.setChecked(prefs.getBoolean("autoBluetooth", false));
+            xpengKeywordInput.setText(prefs.getString("xpengKeyword", "POER_UNLOCK_CHARGER"));
+            xpengPackageInput.setText(prefs.getString("xpengPackage", ""));
+            autoXpengNotificationCheck.setChecked(prefs.getBoolean("autoXpengNotification", true));
+            bluetoothCompatibleModeCheck.setChecked(prefs.getBoolean("bluetoothCompatibleMode", true));
+            selectedDeviceType = prefs.getInt("deviceType", 0);
+            deviceTypeSpinner.setSelection(selectedDeviceType);
+        } finally {
+            loadingPrefs = false;
+        }
         updateSavedConfigText();
+    }
+
+    private void migrateBluetoothModeDefault(SharedPreferences prefs) {
+        if (prefs.getBoolean("bluetoothModeDefaultMigrated", false)) return;
+        prefs.edit()
+                .putBoolean("bluetoothCompatibleMode", true)
+                .putBoolean("bluetoothModeDefaultMigrated", true)
+                .apply();
+    }
+
+    private void savePrefsIfReady() {
+        if (!loadingPrefs) savePrefs();
     }
 
     private void savePrefs() {
@@ -422,7 +441,8 @@ public class MainActivity extends Activity {
         String macText = mac.length() == 12 ? mac : "未设置";
         String keyText = key.length() == 32 ? "已保存" : "未填写";
         String typeText = deviceType == 1 ? "直流桩" : "普通/交流桩";
-        String modeText = prefs.getBoolean("bluetoothCompatibleMode", true) ? "兼容模式" : "高强度模式";
+        boolean compatibleMode = prefs.getBoolean("bluetoothCompatibleMode", true);
+        String modeText = compatibleMode ? "兼容模式" : "高强度模式（可能增加蓝牙异常/耗电风险）";
         savedConfigText.setText("已保存 MAC：" + macText + "\nKey：" + keyText + "，设备类型：" + typeText + "，蓝牙：" + modeText);
     }
 

@@ -1,13 +1,14 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.poersmart.charge"
-    android:versionCode="16"
-    android:versionName="1.6.5-car-key">
+    android:versionCode="17"
+    android:versionName="1.6.6-car-key">
     <uses-sdk android:minSdkVersion="21" android:targetSdkVersion="23" />
     <uses-permission android:name="android.permission.BLUETOOTH" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
     <application android:theme="@style/AppTheme" android:label="桩小易蓝牙钥匙" android:icon="@drawable/ic_launcher" android:usesCleartextTraffic="true" android:allowBackup="false">
         <activity
@@ -22,7 +23,7 @@
         <service android:name=".KeyBroadcastService" android:exported="false" />
         <service
             android:name=".XpengNotificationListenerService"
-            android:label="桩小易小鹏通知自动解锁"
+            android:label="桩小易自动化通知解锁"
             android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"
             android:exported="true">
             <intent-filter>
@@ -40,6 +41,13 @@
         <receiver android:name=".AutoBluetoothReceiver" android:exported="true">
             <intent-filter>
                 <action android:name="android.bluetooth.device.action.ACL_CONNECTED" />
+            </intent-filter>
+        </receiver>
+        <receiver android:name=".BootReceiver" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
             </intent-filter>
         </receiver>
     </application>

@@ -113,6 +113,11 @@ public class KeyBroadcastService extends Service {
                 toast("Key 应为 32 位十六进制或留空");
                 return;
             }
+            if (stopCharge && key.length() == 32) {
+                notifyState("停充未执行", "带 Key 的设备没有已验证的停充协议");
+                toast("带 Key 的设备暂不支持停充，操作已取消");
+                return;
+            }
 
             int command = 0;
             int type = deviceType == 1 ? 1 : 2;

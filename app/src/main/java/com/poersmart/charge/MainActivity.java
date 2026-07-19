@@ -578,6 +578,9 @@ public class MainActivity extends Activity {
             String key = normalizeHex(keyInput.getText().toString());
             validateMac(mac);
             if (key.length() > 0) validateKey(key);
+            if (stopCharge && key.length() == 32) {
+                throw new Exception("带 Key 的设备暂不支持停充，操作已取消");
+            }
             savePrefs();
 
             String action = stopCharge ? KeyBroadcastService.ACTION_STOP_CHARGE : KeyBroadcastService.ACTION_UNLOCK;

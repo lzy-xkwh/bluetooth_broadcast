@@ -13,8 +13,15 @@ public class XpengNotificationListenerService extends NotificationListenerServic
     private static final String DEFAULT_KEYWORD = "POER_UNLOCK_CHARGER";
     private static final long COOLDOWN_MS = 60000L;
 
+    @Override public void onListenerConnected() {
+        super.onListenerConnected();
+        NotificationWatchdogReceiver.schedule(this);
+        startKeyService(KeyBroadcastService.ACTION_SHOW);
+    }
+
     @Override public void onNotificationPosted(StatusBarNotification sbn) {
         if (sbn == null || sbn.getNotification() == null) return;
+        if (getPackageName().equals(sbn.getPackageName())) return;
 
         SharedPreferences prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
         if (!prefs.getBoolean("autoXpengNotification", true)) return;
@@ -26,23 +33,43 @@ public class XpengNotificationListenerService extends NotificationListenerServic
 
         String packageFilter = prefs.getString("xpengPackage", "");
         packageFilter = packageFilter == null ? "" : packageFilter.trim();
-        if (packageFilter.length() > 0 && !sbn.getPackageName().equals(packageFilter)) return;
+        if (packageFilter.length() > 0 && !sbn.getPackageName().equalsIgnoreCase(packageFilter)) return;
 
         String text = notificationText(sbn);
         if (!containsIgnoreCase(text, keyword)) return;
 
         long now = System.currentTimeMillis();
         long last = prefs.getLong("lastXpengNotificationUnlockAt", 0L);
-        if (now - last < COOLDOWN_MS) return;
+        if (last > 0L && now >= last && now - last < COOLDOWN_MS) return;
 
+        if (!startKeyService(KeyBroadcastService.ACTION_UNLOCK)) return;
         prefs.edit()
                 .putLong("lastXpengNotificationUnlockAt", now)
                 .putString("lastXpengNotificationPackage", sbn.getPackageName())
                 .apply();
+    }
 
-        Intent service = new Intent(this, KeyBroadcastService.class);
-        service.setAction(KeyBroadcastService.ACTION_UNLOCK);
-        startService(service);
+    private boolean startKeyService(String action) {
+        try {
+            Intent service = new Intent(this, KeyBroadcastService.class);
+            service.setAction(action);
+            startService(service);
+            return true;
+        } catch (RuntimeException e) {
+            getSharedPreferences(PREFS, MODE_PRIVATE).edit()
+                    .putString("lastAutomationStartError", safeMessage(e))
+                    .putLong("lastAutomationStartErrorAt", System.currentTimeMillis())
+                    .apply();
+            NotificationWatchdogReceiver.scheduleSoon(this);
+            return false;
+        }
+    }
+
+    private static String safeMessage(Throwable error) {
+        String message = error.getMessage();
+        return message == null || message.length() == 0
+                ? error.getClass().getSimpleName()
+                : error.getClass().getSimpleName() + ": " + message;
     }
 
     private static String notificationText(StatusBarNotification sbn) {

@@ -12,6 +12,7 @@ import android.bluetooth.le.BluetoothLeAdvertiser;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
@@ -31,6 +32,8 @@ public class KeyBroadcastService extends Service {
     private static final int NOTIFICATION_ID = 7;
     private static final int BROADCAST_MS = 10000;
     private static final String APP_TITLE = "桩小易蓝牙钥匙";
+    private static final String PERMISSION_BLUETOOTH_ADVERTISE = "android.permission.BLUETOOTH_ADVERTISE";
+    private static final String PERMISSION_BLUETOOTH_CONNECT = "android.permission.BLUETOOTH_CONNECT";
 
     private BluetoothAdapter bluetoothAdapter;
     private BluetoothLeAdvertiser advertiser;
@@ -105,6 +108,11 @@ public class KeyBroadcastService extends Service {
                 toast("先打开 App 保存充电桩 MAC");
                 return;
             }
+            if (key.length() != 0 && key.length() != 32) {
+                notifyState("Key 无效", "Key 应为 32 位十六进制或留空");
+                toast("Key 应为 32 位十六进制或留空");
+                return;
+            }
 
             int command = 0;
             int type = deviceType == 1 ? 1 : 2;
@@ -117,26 +125,43 @@ public class KeyBroadcastService extends Service {
             handler.removeCallbacks(autoStopRunnable);
             handler.postDelayed(autoStopRunnable, BROADCAST_MS);
         } catch (Exception e) {
-            notifyState("广播失败", e.getMessage());
-            toast(e.getMessage());
+            String message = safeMessage(e);
+            notifyState("广播失败", message);
+            toast(message);
         }
     }
 
     private boolean canAdvertise() {
-        return bluetoothAdapter != null
-                && bluetoothAdapter.isEnabled()
-                && Build.VERSION.SDK_INT >= 21
-                && bluetoothAdapter.isMultipleAdvertisementSupported()
-                && bluetoothAdapter.getBluetoothLeAdvertiser() != null;
+        if (!hasBluetoothRuntimePermissions()) return false;
+        try {
+            return bluetoothAdapter != null
+                    && bluetoothAdapter.isEnabled()
+                    && Build.VERSION.SDK_INT >= 21
+                    && bluetoothAdapter.isMultipleAdvertisementSupported()
+                    && bluetoothAdapter.getBluetoothLeAdvertiser() != null;
+        } catch (SecurityException ignored) {
+            return false;
+        }
     }
 
     private String capabilityMessage() {
+        if (!hasBluetoothRuntimePermissions()) return "请允许附近设备/蓝牙权限";
         if (bluetoothAdapter == null) return "手机没有蓝牙适配器";
-        if (!bluetoothAdapter.isEnabled()) return "蓝牙未开启";
-        if (Build.VERSION.SDK_INT < 21) return "Android 版本过低";
-        if (!bluetoothAdapter.isMultipleAdvertisementSupported()) return "手机不支持 BLE 广播";
-        if (bluetoothAdapter.getBluetoothLeAdvertiser() == null) return "无法获取 BLE advertiser";
+        try {
+            if (!bluetoothAdapter.isEnabled()) return "蓝牙未开启";
+            if (Build.VERSION.SDK_INT < 21) return "Android 版本过低";
+            if (!bluetoothAdapter.isMultipleAdvertisementSupported()) return "手机不支持 BLE 广播";
+            if (bluetoothAdapter.getBluetoothLeAdvertiser() == null) return "无法获取 BLE advertiser";
+        } catch (SecurityException ignored) {
+            return "系统拒绝蓝牙权限，请重新授权";
+        }
         return "当前不可广播";
+    }
+
+    private boolean hasBluetoothRuntimePermissions() {
+        if (Build.VERSION.SDK_INT < 31) return true;
+        return checkSelfPermission(PERMISSION_BLUETOOTH_ADVERTISE) == PackageManager.PERMISSION_GRANTED
+                && checkSelfPermission(PERMISSION_BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED;
     }
 
     private void startAdvertising(BeaconProtocol.BeaconPayload payload, boolean compatibleMode) throws Exception {
@@ -156,6 +181,10 @@ public class KeyBroadcastService extends Service {
         advertiseCallback = new AdvertiseCallback() {
             @Override public void onStartSuccess(AdvertiseSettings settingsInEffect) {}
             @Override public void onStartFailure(int errorCode) {
+                if (this != advertiseCallback) return;
+                handler.removeCallbacks(autoStopRunnable);
+                advertiseCallback = null;
+                advertiser = null;
                 notifyState("广播启动失败", "错误码：" + errorCode);
             }
         };
@@ -176,7 +205,7 @@ public class KeyBroadcastService extends Service {
 
     private Notification buildNotification(String state, String text) {
         PendingIntent open = PendingIntent.getActivity(this, 1,
-                new Intent(this, MainActivity.class), PendingIntent.FLAG_UPDATE_CURRENT);
+                new Intent(this, MainActivity.class), pendingIntentFlags());
 
         RemoteViews compact = buildCompactNotificationView(state, text);
         compact.setOnClickPendingIntent(R.id.notification_root, open);
@@ -213,6 +242,12 @@ public class KeyBroadcastService extends Service {
         startForeground(NOTIFICATION_ID, buildNotification(state, text));
     }
 
+    private int pendingIntentFlags() {
+        int flags = PendingIntent.FLAG_UPDATE_CURRENT;
+        if (Build.VERSION.SDK_INT >= 23) flags |= PendingIntent.FLAG_IMMUTABLE;
+        return flags;
+    }
+
     private void recordServiceHeartbeat(String action) {
         getSharedPreferences(PREFS, MODE_PRIVATE).edit()
                 .putLong("lastServiceHeartbeatAt", System.currentTimeMillis())
@@ -236,6 +271,11 @@ public class KeyBroadcastService extends Service {
                 Toast.makeText(KeyBroadcastService.this, text, Toast.LENGTH_SHORT).show();
             }
         });
+    }
+
+    private static String safeMessage(Throwable error) {
+        String message = error.getMessage();
+        return message == null || message.length() == 0 ? error.getClass().getSimpleName() : message;
     }
 
     private static String normalizeHex(String value) {

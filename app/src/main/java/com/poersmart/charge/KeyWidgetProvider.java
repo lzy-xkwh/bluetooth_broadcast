@@ -5,6 +5,7 @@ import android.appwidget.AppWidgetManager;
 import android.appwidget.AppWidgetProvider;
 import android.content.Context;
 import android.content.Intent;
+import android.os.Build;
 import android.widget.RemoteViews;
 
 public class KeyWidgetProvider extends AppWidgetProvider {
@@ -15,7 +16,7 @@ public class KeyWidgetProvider extends AppWidgetProvider {
             views.setOnClickPendingIntent(R.id.widget_stop_charge, serviceIntent(context, KeyBroadcastService.ACTION_STOP_CHARGE, 22));
             views.setOnClickPendingIntent(R.id.widget_stop_broadcast, serviceIntent(context, KeyBroadcastService.ACTION_STOP_BROADCAST, 24));
             views.setOnClickPendingIntent(R.id.widget_header, PendingIntent.getActivity(context, 23,
-                    new Intent(context, MainActivity.class), PendingIntent.FLAG_UPDATE_CURRENT));
+                    new Intent(context, MainActivity.class), pendingIntentFlags()));
             manager.updateAppWidget(id, views);
         }
     }
@@ -23,6 +24,12 @@ public class KeyWidgetProvider extends AppWidgetProvider {
     private PendingIntent serviceIntent(Context context, String action, int requestCode) {
         Intent intent = new Intent(context, KeyBroadcastService.class);
         intent.setAction(action);
-        return PendingIntent.getService(context, requestCode, intent, PendingIntent.FLAG_UPDATE_CURRENT);
+        return PendingIntent.getService(context, requestCode, intent, pendingIntentFlags());
+    }
+
+    private int pendingIntentFlags() {
+        int flags = PendingIntent.FLAG_UPDATE_CURRENT;
+        if (Build.VERSION.SDK_INT >= 23) flags |= PendingIntent.FLAG_IMMUTABLE;
+        return flags;
     }
 }

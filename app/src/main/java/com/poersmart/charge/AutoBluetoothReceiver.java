@@ -21,7 +21,7 @@ public class AutoBluetoothReceiver extends BroadcastReceiver {
 
         long now = System.currentTimeMillis();
         long last = prefs.getLong("lastBluetoothUnlockAt", 0L);
-        if (now - last < COOLDOWN_MS) return;
+        if (last > 0L && now >= last && now - last < COOLDOWN_MS) return;
 
         BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
         String name = "";
@@ -42,17 +42,31 @@ public class AutoBluetoothReceiver extends BroadcastReceiver {
         String source = (name + " " + address).toLowerCase(Locale.US);
         if (trigger.length() > 0 && !source.contains(trigger)) return;
 
-        prefs.edit()
-                .putLong("lastBluetoothUnlockAt", now)
-                .putString("lastBluetoothSource", source)
-                .apply();
-
-        Intent service = new Intent(context, KeyBroadcastService.class);
-        service.setAction(KeyBroadcastService.ACTION_UNLOCK);
-        context.startService(service);
+        try {
+            Intent service = new Intent(context, KeyBroadcastService.class);
+            service.setAction(KeyBroadcastService.ACTION_UNLOCK);
+            context.startService(service);
+            prefs.edit()
+                    .putLong("lastBluetoothUnlockAt", now)
+                    .putString("lastBluetoothSource", source)
+                    .apply();
+        } catch (RuntimeException e) {
+            prefs.edit()
+                    .putString("lastBluetoothStartError", safeMessage(e))
+                    .putLong("lastBluetoothStartErrorAt", now)
+                    .apply();
+            NotificationWatchdogReceiver.scheduleSoon(context);
+        }
     }
 
     private static String normalizeHex(String value) {
         return value == null ? "" : value.replaceAll("[^0-9a-fA-F]", "").toUpperCase(Locale.US);
+    }
+
+    private static String safeMessage(Throwable error) {
+        String message = error.getMessage();
+        return message == null || message.length() == 0
+                ? error.getClass().getSimpleName()
+                : error.getClass().getSimpleName() + ": " + message;
     }
 }

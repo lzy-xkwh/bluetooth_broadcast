@@ -7,6 +7,7 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Build;
@@ -31,11 +32,15 @@ import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import java.util.ArrayList;
 import java.util.Locale;
 
 public class MainActivity extends Activity {
     private static final String PREFS = "poersmart_key";
     private static final int REQUEST_PERMISSIONS = 1001;
+    private static final String PERMISSION_BLUETOOTH_ADVERTISE = "android.permission.BLUETOOTH_ADVERTISE";
+    private static final String PERMISSION_BLUETOOTH_CONNECT = "android.permission.BLUETOOTH_CONNECT";
+    private static final String PERMISSION_POST_NOTIFICATIONS = "android.permission.POST_NOTIFICATIONS";
 
     private EditText macInput;
     private EditText keyInput;
@@ -142,8 +147,9 @@ public class MainActivity extends Activity {
         styleButton(stopBroadcastButton, 0xffffffff, 0xffd93025, 0xfff4c7c3);
         stopBroadcastButton.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) {
-                startServiceAction(KeyBroadcastService.ACTION_STOP_BROADCAST);
-                statusText.setText("已请求停止广播，请查看通知栏状态");
+                if (startServiceAction(KeyBroadcastService.ACTION_STOP_BROADCAST)) {
+                    statusText.setText("已请求停止广播，请查看通知栏状态");
+                }
             }
         });
         root.addView(stopBroadcastButton, buttonLayout());
@@ -448,41 +454,59 @@ public class MainActivity extends Activity {
 
     private void requestRuntimePermissions() {
         if (Build.VERSION.SDK_INT < 23) return;
+        ArrayList<String> missing = new ArrayList<String>();
         if (Build.VERSION.SDK_INT >= 31) {
-            requestPermissions(new String[]{
-                    "android.permission.BLUETOOTH_ADVERTISE",
-                    "android.permission.BLUETOOTH_CONNECT"
-            }, REQUEST_PERMISSIONS);
+            if (!hasPermission(PERMISSION_BLUETOOTH_ADVERTISE)) missing.add(PERMISSION_BLUETOOTH_ADVERTISE);
+            if (!hasPermission(PERMISSION_BLUETOOTH_CONNECT)) missing.add(PERMISSION_BLUETOOTH_CONNECT);
+        }
+        if (Build.VERSION.SDK_INT >= 33 && !hasPermission(PERMISSION_POST_NOTIFICATIONS)) {
+            missing.add(PERMISSION_POST_NOTIFICATIONS);
+        }
+        if (!missing.isEmpty()) {
+            requestPermissions(missing.toArray(new String[missing.size()]), REQUEST_PERMISSIONS);
         }
     }
 
     private void startShortcutService() {
-        Intent intent = new Intent(this, KeyBroadcastService.class);
-        intent.setAction(KeyBroadcastService.ACTION_SHOW);
-        startService(intent);
+        startServiceAction(KeyBroadcastService.ACTION_SHOW);
     }
 
     @Override public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         updateCapabilityStatus();
+        startShortcutService();
     }
 
     private void updateCapabilityStatus() {
         String status;
         boolean ok = canAdvertise();
-        if (bluetoothAdapter == null) {
-            status = "不可用：车机没有蓝牙适配器";
-        } else if (!bluetoothAdapter.isEnabled()) {
-            status = "不可用：蓝牙未开启";
-        } else if (Build.VERSION.SDK_INT < 21) {
-            status = "不可用：Android 版本过低，不支持 BLE 广播";
-        } else if (!bluetoothAdapter.isMultipleAdvertisementSupported()) {
-            status = "不可用：此车机蓝牙芯片不支持 BLE 广播/Peripheral 模式";
+        if (!hasBluetoothRuntimePermissions()) {
+            status = "不可用：请允许附近设备/蓝牙权限";
+        } else if (bluetoothAdapter == null) {
+            status = "不可用：设备没有蓝牙适配器";
         } else {
-            status = "可用：车机支持 BLE 广播";
+            try {
+                if (!bluetoothAdapter.isEnabled()) {
+                    status = "不可用：蓝牙未开启";
+                } else if (Build.VERSION.SDK_INT < 21) {
+                    status = "不可用：Android 版本过低，不支持 BLE 广播";
+                } else if (!bluetoothAdapter.isMultipleAdvertisementSupported()) {
+                    status = "不可用：此设备不支持 BLE 广播/Peripheral 模式";
+                } else if (bluetoothAdapter.getBluetoothLeAdvertiser() == null) {
+                    status = "不可用：无法获取 BLE 广播器";
+                } else {
+                    status = "可用：设备支持 BLE 广播";
+                }
+            } catch (SecurityException ignored) {
+                status = "不可用：系统拒绝蓝牙权限，请重新授权";
+                ok = false;
+            }
         }
         status += "\n通知监听：" + (isNotificationListenerEnabled() ? "已授权" : "未授权");
-        status += "\n服务自恢复：已启用（" + NotificationWatchdogReceiver.intervalMinutes() + " 分钟检查）";
+        if (Build.VERSION.SDK_INT >= 33) {
+            status += "，通知显示：" + (hasPermission(PERMISSION_POST_NOTIFICATIONS) ? "已允许" : "未允许");
+        }
+        status += "\n服务自恢复：已启用（" + NotificationWatchdogReceiver.intervalHours() + " 小时检查）";
         status += "，最近运行：" + recentServiceHeartbeat();
         statusText.setText(status);
         unlockButton.setEnabled(ok);
@@ -520,18 +544,34 @@ public class MainActivity extends Activity {
     }
 
     private boolean canAdvertise() {
-        return bluetoothAdapter != null
-                && bluetoothAdapter.isEnabled()
-                && Build.VERSION.SDK_INT >= 21
-                && bluetoothAdapter.isMultipleAdvertisementSupported()
-                && bluetoothAdapter.getBluetoothLeAdvertiser() != null;
+        if (!hasBluetoothRuntimePermissions()) return false;
+        try {
+            return bluetoothAdapter != null
+                    && bluetoothAdapter.isEnabled()
+                    && Build.VERSION.SDK_INT >= 21
+                    && bluetoothAdapter.isMultipleAdvertisementSupported()
+                    && bluetoothAdapter.getBluetoothLeAdvertiser() != null;
+        } catch (SecurityException ignored) {
+            return false;
+        }
+    }
+
+    private boolean hasBluetoothRuntimePermissions() {
+        return Build.VERSION.SDK_INT < 31
+                || (hasPermission(PERMISSION_BLUETOOTH_ADVERTISE)
+                && hasPermission(PERMISSION_BLUETOOTH_CONNECT));
+    }
+
+    private boolean hasPermission(String permission) {
+        return Build.VERSION.SDK_INT < 23
+                || checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED;
     }
 
     private void requestServiceBroadcast(boolean stopCharge) {
         try {
             if (!canAdvertise()) {
                 updateCapabilityStatus();
-                toast("当前车机不能发 BLE 广播");
+                toast("当前设备不能发 BLE 广播");
                 return;
             }
             String mac = normalizeHex(macInput.getText().toString());
@@ -541,19 +581,28 @@ public class MainActivity extends Activity {
             savePrefs();
 
             String action = stopCharge ? KeyBroadcastService.ACTION_STOP_CHARGE : KeyBroadcastService.ACTION_UNLOCK;
-            startServiceAction(action);
+            if (!startServiceAction(action)) return;
             uuidText.setText("广播由后台服务执行，通知栏会同步显示状态。");
             statusText.setText("已请求" + (stopCharge ? "停止充电" : "解锁/启动") + "广播，10 秒后自动停止");
         } catch (Exception e) {
-            statusText.setText("失败：" + e.getMessage());
-            toast(e.getMessage());
+            String message = safeMessage(e);
+            statusText.setText("失败：" + message);
+            toast(message);
         }
     }
 
-    private void startServiceAction(String action) {
-        Intent intent = new Intent(this, KeyBroadcastService.class);
-        intent.setAction(action);
-        startService(intent);
+    private boolean startServiceAction(String action) {
+        try {
+            Intent intent = new Intent(this, KeyBroadcastService.class);
+            intent.setAction(action);
+            startService(intent);
+            return true;
+        } catch (RuntimeException e) {
+            String message = e.getMessage();
+            statusText.setText("后台服务启动失败：" + (message == null ? e.getClass().getSimpleName() : message));
+            toast("后台服务启动失败");
+            return false;
+        }
     }
 
     private static String normalizeHex(String value) {
@@ -572,5 +621,10 @@ public class MainActivity extends Activity {
 
     private void toast(String message) {
         Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
+    }
+
+    private static String safeMessage(Throwable error) {
+        String message = error.getMessage();
+        return message == null || message.length() == 0 ? error.getClass().getSimpleName() : message;
     }
 }

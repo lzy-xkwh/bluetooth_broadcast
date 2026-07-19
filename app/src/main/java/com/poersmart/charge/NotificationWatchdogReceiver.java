@@ -13,7 +13,7 @@ public class NotificationWatchdogReceiver extends BroadcastReceiver {
     private static final String ACTION_CHECK = "com.poersmart.charge.action.CHECK_SERVICE";
     private static final String PREFS = "poersmart_key";
     private static final int REQUEST_CODE = 701;
-    private static final long CHECK_INTERVAL_MS = 15L * 60L * 1000L;
+    private static final long CHECK_INTERVAL_MS = 6L * 60L * 60L * 1000L;
     private static final long QUICK_RECOVERY_MS = 60L * 1000L;
 
     @Override public void onReceive(Context context, Intent intent) {
@@ -47,8 +47,8 @@ public class NotificationWatchdogReceiver extends BroadcastReceiver {
         scheduleAfter(context, QUICK_RECOVERY_MS);
     }
 
-    static long intervalMinutes() {
-        return CHECK_INTERVAL_MS / 60000L;
+    static long intervalHours() {
+        return CHECK_INTERVAL_MS / (60L * 60L * 1000L);
     }
 
     private static void scheduleAfter(Context context, long delayMs) {
@@ -59,7 +59,7 @@ public class NotificationWatchdogReceiver extends BroadcastReceiver {
                 context,
                 REQUEST_CODE,
                 new Intent(context, NotificationWatchdogReceiver.class).setAction(ACTION_CHECK),
-                PendingIntent.FLAG_UPDATE_CURRENT);
+                pendingIntentFlags());
         long triggerAt = SystemClock.elapsedRealtime() + delayMs;
         try {
             if (Build.VERSION.SDK_INT >= 23) {
@@ -75,6 +75,12 @@ public class NotificationWatchdogReceiver extends BroadcastReceiver {
         prefs.edit()
                 .putLong("nextWatchdogCheckAt", System.currentTimeMillis() + delayMs)
                 .apply();
+    }
+
+    private static int pendingIntentFlags() {
+        int flags = PendingIntent.FLAG_UPDATE_CURRENT;
+        if (Build.VERSION.SDK_INT >= 23) flags |= PendingIntent.FLAG_IMMUTABLE;
+        return flags;
     }
 
     private static String safeMessage(Throwable error) {

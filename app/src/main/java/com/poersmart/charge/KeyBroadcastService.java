@@ -48,6 +48,7 @@ public class KeyBroadcastService extends Service {
         handler = new Handler(Looper.getMainLooper());
         BluetoothManager manager = (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
         bluetoothAdapter = manager == null ? null : manager.getAdapter();
+        NotificationWatchdogReceiver.schedule(this);
     }
 
     @Override public int onStartCommand(Intent intent, int flags, int startId) {
@@ -55,6 +56,8 @@ public class KeyBroadcastService extends Service {
         if (action == null) action = ACTION_SHOW;
 
         startForeground(NOTIFICATION_ID, buildNotification("待命", "小组件可解锁/停充/停止"));
+        recordServiceHeartbeat(action);
+        NotificationWatchdogReceiver.schedule(this);
 
         if (ACTION_UNLOCK.equals(action)) {
             startKeyBroadcast(false);
@@ -72,7 +75,16 @@ public class KeyBroadcastService extends Service {
 
     @Override public void onDestroy() {
         stopAdvertising(null);
+        getSharedPreferences(PREFS, MODE_PRIVATE).edit()
+                .putLong("lastServiceDestroyedAt", System.currentTimeMillis())
+                .apply();
+        NotificationWatchdogReceiver.scheduleSoon(this);
         super.onDestroy();
+    }
+
+    @Override public void onTaskRemoved(Intent rootIntent) {
+        NotificationWatchdogReceiver.scheduleSoon(this);
+        super.onTaskRemoved(rootIntent);
     }
 
     private void startKeyBroadcast(boolean stopCharge) {
@@ -199,6 +211,15 @@ public class KeyBroadcastService extends Service {
 
     private void notifyState(String state, String text) {
         startForeground(NOTIFICATION_ID, buildNotification(state, text));
+    }
+
+    private void recordServiceHeartbeat(String action) {
+        getSharedPreferences(PREFS, MODE_PRIVATE).edit()
+                .putLong("lastServiceHeartbeatAt", System.currentTimeMillis())
+                .putString("lastServiceAction", action)
+                .remove("lastWatchdogError")
+                .remove("lastWatchdogErrorAt")
+                .apply();
     }
 
     private void migrateBluetoothModeDefault(SharedPreferences prefs) {

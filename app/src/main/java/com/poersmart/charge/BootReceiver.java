@@ -17,5 +17,6 @@ public class BootReceiver extends BroadcastReceiver {
         Intent service = new Intent(context, KeyBroadcastService.class);
         service.setAction(KeyBroadcastService.ACTION_SHOW);
         context.startService(service);
+        NotificationWatchdogReceiver.schedule(context);
     }
 }

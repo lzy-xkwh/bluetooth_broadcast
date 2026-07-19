@@ -482,6 +482,8 @@ public class MainActivity extends Activity {
             status = "可用：车机支持 BLE 广播";
         }
         status += "\n通知监听：" + (isNotificationListenerEnabled() ? "已授权" : "未授权");
+        status += "\n服务自恢复：已启用（" + NotificationWatchdogReceiver.intervalMinutes() + " 分钟检查）";
+        status += "，最近运行：" + recentServiceHeartbeat();
         statusText.setText(status);
         unlockButton.setEnabled(ok);
         stopChargeButton.setEnabled(ok);
@@ -503,6 +505,18 @@ public class MainActivity extends Activity {
         } catch (Exception e) {
             return false;
         }
+    }
+
+    private String recentServiceHeartbeat() {
+        long last = getSharedPreferences(PREFS, MODE_PRIVATE).getLong("lastServiceHeartbeatAt", 0L);
+        if (last <= 0L) return "暂无记录";
+        long elapsed = Math.max(0L, System.currentTimeMillis() - last);
+        if (elapsed < 60000L) return "刚刚";
+        long minutes = elapsed / 60000L;
+        if (minutes < 60L) return minutes + " 分钟前";
+        long hours = minutes / 60L;
+        if (hours < 24L) return hours + " 小时前";
+        return (hours / 24L) + " 天前";
     }
 
     private boolean canAdvertise() {
